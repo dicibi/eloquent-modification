@@ -2,8 +2,6 @@
 
 namespace Dicibi\EloquentModification\Contracts\Modification;
 
-use Illuminate\Database\Eloquent\Model;
-
 interface ModifiableBag
 {
     public function getPayloads(): array;

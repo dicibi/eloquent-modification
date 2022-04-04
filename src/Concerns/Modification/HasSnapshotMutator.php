@@ -2,11 +2,11 @@
 
 namespace Dicibi\EloquentModification\Concerns\Modification;
 
-use Illuminate\Support\Arr;
 use Dicibi\EloquentModification\Models\Modification;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
+use Illuminate\Support\Arr;
 
 /**
  * @property Modification|null pendingModification
@@ -144,6 +144,7 @@ trait HasSnapshotMutator
         foreach ($this->getAttributes() as $key => $value) {
             if (property_exists($payloadFromModification, $key)) {
                 $difference[$key] = $payloadFromModification->{$key};
+
                 continue;
             }
             if (! $mutateAttributeIsEquivalentWithState($key)) {

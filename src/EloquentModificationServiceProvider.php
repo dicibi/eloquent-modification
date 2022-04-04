@@ -16,7 +16,6 @@ class EloquentModificationServiceProvider extends ServiceProvider
 
             $this->loadMigrationsFrom(__DIR__.'/../migrations');
         }
-
     }
 
     public function register(): void
