@@ -2,8 +2,8 @@
 
 namespace Dicibi\EloquentModification\Concerns\Modification;
 
-use Dicibi\EloquentModification\Models\Modification;
 use Dicibi\EloquentModification\Jobs\Modification\ProceedModification;
+use Dicibi\EloquentModification\Models\Modification;
 
 trait PendingModifiable
 {

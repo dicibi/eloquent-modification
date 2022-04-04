@@ -1,8 +1,8 @@
 <?php
 
+use Dicibi\EloquentModification\Tests\Helper;
 use function PHPUnit\Framework\assertCount;
 use function PHPUnit\Framework\assertEquals;
-use Dicibi\EloquentModification\Tests\Helper;
 
 $helper = new Helper();
 

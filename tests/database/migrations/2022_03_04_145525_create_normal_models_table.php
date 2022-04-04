@@ -1,6 +1,5 @@
 <?php
 
-use Dicibi\EloquentModification\Models\Modification;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;

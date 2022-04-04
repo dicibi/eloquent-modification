@@ -2,8 +2,8 @@
 
 namespace Dicibi\EloquentModification\Contracts\Modification;
 
-use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
 
 interface Modifiable
 {
