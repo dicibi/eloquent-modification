@@ -1,8 +1,8 @@
-# Capture, Rollback and Verify Changes on Eloquent
+# Eloquent Modification
 
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/dicibi/eloquent-modification.svg?style=flat-square)](https://packagist.org/packages/dicibi/eloquent-modification)
 
-This is where your description should go. Try and limit it to a paragraph or two. Consider adding a small example.
+Capture, Rollback and Verify Changes on Eloquent
 
 ## Installation
 
