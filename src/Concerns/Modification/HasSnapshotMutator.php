@@ -8,7 +8,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Arr;
 
-
 /**
  * @property Modification|null pendingModification
  */
@@ -109,6 +108,7 @@ trait HasSnapshotMutator
         foreach ($this->getAttributes() as $key => $value) {
             if (property_exists($payloadFromModification, $key)) {
                 $difference[$key] = $payloadFromModification->{$key};
+
                 continue;
             }
             if (! $mutateAttributeIsEquivalentWithState($key)) {

@@ -32,8 +32,7 @@ class ProceedModification implements ShouldQueue
         protected string                                                     $status = Modification::STATUS_APPLIED,
         protected string                                                     $action = Modification::ACTION_UPDATE,
         protected ?string                                                    $info = null,
-    )
-    {
+    ) {
     }
 
     public function handle(): void
@@ -103,13 +102,12 @@ class ProceedModification implements ShouldQueue
         string                                                     $status = Modification::STATUS_APPLIED,
         string                                                     $action = Modification::ACTION_UPDATE,
         ?string                                                    $info = null,
-    ): self|null
-    {
-        if (!$modifiable->isDirty()) {
+    ): self|null {
+        if (! $modifiable->isDirty()) {
             return null;
         }
 
-        if (!$modifiable->getWillRecordModification()) {
+        if (! $modifiable->getWillRecordModification()) {
             return null;
         }
 
