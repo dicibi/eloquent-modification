@@ -15,10 +15,13 @@ return new class () extends Migration {
             $table->uuid('modifiable_uuid')->nullable();
             $table->unsignedInteger('modifiable_id')->nullable();
 
+            $table->string('identifier')->nullable();
+
             $table->string('action');
             $table->jsonb('state')->nullable();
             $table->jsonb('payloads')->nullable();
             $table->string('status')->default(Modification::STATUS_PENDING);
+            $table->string('condition')->nullable();
             $table->string('info')->nullable();
             $table->foreignId('submitted_by')->nullable()->constrained()->references('id')->on('users');
             $table->foreignId('reviewed_by')->nullable()->constrained()->references('id')->on('users');

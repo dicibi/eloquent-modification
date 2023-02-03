@@ -2,52 +2,37 @@
 
 namespace Dicibi\EloquentModification\Concerns\Modification;
 
-use Dicibi\EloquentModification\Contracts\Modification\HasModifiableLimit;
 use Dicibi\EloquentModification\Contracts\Modification\Modifiable as ModifiableContract;
 use Dicibi\EloquentModification\Contracts\Modification\ModifiableBag as ModifiableBagContract;
 use Dicibi\EloquentModification\Jobs\Modification\ProceedModification;
 use Dicibi\EloquentModification\Models\Modification;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
+use Illuminate\Support\Facades\Bus;
 
 /**
- * @property  \Illuminate\Database\Eloquent\Collection|null modifications
- * @property Modification|null modification
+ * @property  Collection|null modifications
+ * @property  Modification|null modification
  */
 trait Modifiable
 {
     public static function bootModifiable(): void
     {
         self::updating(static function (ModifiableContract|Model $modifiable) {
-            if ($modifiable->isDirty()) {
-                $modifiableBag = $modifiable->getModifiableBag();
-                $payloads = $modifiableBag->getPayloads();
+            $proceedModificationJob = ProceedModification::make(
+                modifiable: $modifiable,
+                executor: auth()->user(),
+            );
 
-                if ($modifiable instanceof HasModifiableLimit) {
-                    $captureAttributes = $modifiable->captureAttributes();
-
-                    $payloads = array_filter($payloads, static function ($value, $key) use ($captureAttributes) {
-                        return in_array($key, $captureAttributes, true);
-                    }, ARRAY_FILTER_USE_BOTH);
-
-                    // prevent saving modifications if there are no changes
-                    if (empty($payloads)) {
-                        return;
-                    }
-
-                    $modifiableBag->setPayloads($payloads);
-                }
-
-                dispatch(new ProceedModification(
-                    $modifiable,
-                    auth()->user(),
-                    Modification::STATUS_APPLIED,
-                    modifiableBag: $modifiableBag,
-                ));
+            if ($proceedModificationJob) {
+                Bus::dispatchSync($proceedModificationJob);
             }
         });
     }
+
+    private bool $willRecordModification = true;
 
     public function modifications(): MorphMany
     {
@@ -77,15 +62,20 @@ trait Modifiable
 
     public function getModifiableBag(): ModifiableBagContract
     {
-        return new Modifiable\Bag($this->getDirty(), $this->getRawOriginal());
+        $payloads = $this->getDirty();
+
+        return new Modifiable\Bag($payloads, $this->getOriginal());
     }
 
-    public function castModifiableAttribute(string $key, mixed $value): mixed
+    public function getWillRecordModification(): bool
     {
-        if ($this->hasCast($key)) {
-            return $this->castAttribute($key, $value);
-        }
+        return $this->willRecordModification;
+    }
 
-        return $value;
+    public function saveWithoutModifiable(): void
+    {
+        $this->willRecordModification = false;
+
+        $this->save();
     }
 }

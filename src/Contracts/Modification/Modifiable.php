@@ -13,7 +13,9 @@ interface Modifiable
 
     public function getModifiableBag(): ModifiableBag;
 
-    public function castModifiableAttribute(string $key, mixed $value): mixed;
-
     public function getKey();
+
+    public function getWillRecordModification(): bool;
+
+    public function saveWithoutModifiable(): void;
 }

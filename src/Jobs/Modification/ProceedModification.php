@@ -2,8 +2,10 @@
 
 namespace Dicibi\EloquentModification\Jobs\Modification;
 
+use Dicibi\EloquentModification\Contracts\Modification\HasModifiableLimit;
 use Dicibi\EloquentModification\Contracts\Modification\Modifiable;
 use Dicibi\EloquentModification\Contracts\Modification\ModifiableBag as ModifiableBagContract;
+use Dicibi\EloquentModification\Contracts\Modification\ModifiableHasIdentifier;
 use Dicibi\EloquentModification\Contracts\Modification\PendingModifiable;
 use Dicibi\EloquentModification\Models\Modification;
 use Illuminate\Bus\Queueable;
@@ -13,6 +15,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use stdClass;
 
 class ProceedModification implements ShouldQueue
 {
@@ -21,33 +24,18 @@ class ProceedModification implements ShouldQueue
     use Queueable;
     use SerializesModels;
 
-    /**
-     * Create a new job instance.
-     *
-     * @return void
-     */
     public function __construct(
-        protected Model|Modifiable|PendingModifiable $modifiable,
-        protected ?Authenticatable $executor = null,
-        protected string $status = Modification::STATUS_APPLIED,
-        protected ?string $action = Modification::ACTION_UPDATE,
-        protected ?string $info = null,
-        private ?ModifiableBagContract $modifiableBag = null,
-    ) {
-        if (! $this->modifiableBag) {
-            $this->modifiableBag = $this->modifiable->getModifiableBag();
-        }
-
-        if (Modification::STATUS_PENDING === $this->status && $this->modifiable instanceof PendingModifiable) {
-            $this->modifiable->rollbackChanges();
-        }
+        protected Model|Modifiable|PendingModifiable|ModifiableHasIdentifier $modifiable,
+        protected ModifiableBagContract                                      $modifiableBag,
+        protected ?Authenticatable                                           $executor = null,
+        protected ?Authenticatable                                           $reviewer = null,
+        protected string                                                     $status = Modification::STATUS_APPLIED,
+        protected string                                                     $action = Modification::ACTION_UPDATE,
+        protected ?string                                                    $info = null,
+    )
+    {
     }
 
-    /**
-     * Execute the job.
-     *
-     * @return void
-     */
     public function handle(): void
     {
         /** @var Modification $modification */
@@ -55,13 +43,26 @@ class ProceedModification implements ShouldQueue
 
         $modification->setModifiable($this->modifiable);
 
+        if ($this->modifiable instanceof HasModifiableLimit) {
+            $modification->identifier = $this->modifiable->getIdentifierForModifiable();
+        }
+
         $modification->status = $this->status;
         $modification->action = $this->action;
 
-        $this->modifiableBag->castAttributesFromModifiable($this->modifiable);
+        $modification->state = $this->modifiableBag->getState() ?: new stdClass();
 
-        $modification->payloads = $this->modifiableBag->getPayloads() ?: new \stdClass();
-        $modification->state = $this->modifiableBag->getState() ?: new \stdClass();
+        if ($modification->exists && $modification->payloads instanceof stdClass) {
+            $payloads = $modification->payloads;
+
+            foreach ($this->modifiableBag->getPayloads() as $key => $value) {
+                $payloads->{$key} = $value;
+            }
+
+            $modification->payloads = $payloads;
+        } else {
+            $modification->payloads = $this->modifiableBag->getPayloads() ?: new stdClass();
+        }
 
         if ($this->info) {
             $modification->info = $this->info;
@@ -69,6 +70,10 @@ class ProceedModification implements ShouldQueue
 
         if ($this->executor) {
             $modification->submitter()->associate($this->executor);
+        }
+
+        if ($this->reviewer) {
+            $modification->reviewer()->associate($this->reviewer);
         }
 
         if (Modification::STATUS_APPLIED === $modification->status) {
@@ -89,5 +94,55 @@ class ProceedModification implements ShouldQueue
             ->where('submitted_by', $this->executor?->getAuthIdentifier())
             ->where('status', Modification::STATUS_PENDING)
             ->firstOrNew();
+    }
+
+    public static function make(
+        Model|Modifiable|PendingModifiable|ModifiableHasIdentifier $modifiable,
+        ?Authenticatable                                           $executor = null,
+        ?Authenticatable                                           $reviewer = null,
+        string                                                     $status = Modification::STATUS_APPLIED,
+        string                                                     $action = Modification::ACTION_UPDATE,
+        ?string                                                    $info = null,
+    ): self|null
+    {
+        if (!$modifiable->isDirty()) {
+            return null;
+        }
+
+        if (!$modifiable->getWillRecordModification()) {
+            return null;
+        }
+
+        $modifiableBag = $modifiable->getModifiableBag();
+        $payloads = $modifiableBag->getPayloads();
+
+        if ($modifiable instanceof HasModifiableLimit) {
+            $captureAttributes = $modifiable->captureAttributes();
+
+            $payloads = array_filter($payloads, static function ($value, $key) use ($captureAttributes) {
+                return in_array($key, $captureAttributes, true);
+            }, ARRAY_FILTER_USE_BOTH);
+
+            // prevent saving modifications if there are no changes
+            if (empty($payloads)) {
+                return null;
+            }
+
+            $modifiableBag->setPayloads($payloads);
+        }
+
+        if (Modification::STATUS_PENDING === $status && $modifiable instanceof PendingModifiable) {
+            $modifiable->rollbackChanges();
+        }
+
+        return new static(
+            modifiable: $modifiable,
+            modifiableBag: $modifiableBag,
+            executor: $executor,
+            reviewer: $reviewer,
+            status: $status,
+            action: $action,
+            info: $info,
+        );
     }
 }

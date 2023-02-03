@@ -4,19 +4,30 @@ namespace Dicibi\EloquentModification\Concerns\Modification;
 
 use Dicibi\EloquentModification\Jobs\Modification\ProceedModification;
 use Dicibi\EloquentModification\Models\Modification;
+use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
+use Illuminate\Support\Facades\Bus;
 
 trait PendingModifiable
 {
-    public function saveLater(): bool
+    public function saveLater(?Authenticatable $executor = null, ?Authenticatable $reviewer = null, ...$jobChains): bool
     {
-        if ($this->isDirty()) {
-            dispatch(new ProceedModification(
-                $this,
-                auth()->user(),
-                Modification::STATUS_PENDING,
-            ));
+        $proceedModificationJob = ProceedModification::make(
+            modifiable: $this,
+            executor: $executor ?? auth()->user(),
+            reviewer: $reviewer,
+            status: Modification::STATUS_PENDING,
+        );
+
+        if ($proceedModificationJob) {
+            Bus::chain([
+                $proceedModificationJob,
+                ...$jobChains,
+            ])->onConnection('sync')->dispatch();
         }
 
+        // we do a save here because, maybe the model is implement HasModifiableLimit,
+        // and we need to save the rest of the unfiltered columns
         return $this->save();
     }
 
@@ -34,5 +45,12 @@ trait PendingModifiable
         }
 
         return $this->save();
+    }
+
+    public function pendingModification(): MorphOne
+    {
+        return $this->morphOne(Modification::class, 'modifiable')
+            ->latestOfMany()
+            ->where('status', Modification::STATUS_PENDING);
     }
 }

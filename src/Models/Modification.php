@@ -2,38 +2,42 @@
 
 namespace Dicibi\EloquentModification\Models;
 
-use Dicibi\EloquentModification\Concerns\Database\UuidAsPrimaryKey;
 use Dicibi\EloquentModification\Contracts\Modification\Modifiable;
 use Dicibi\EloquentModification\Facades\EloquentModification;
+use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations;
+use Illuminate\Support\Carbon;
 
 /**
  * @property string $action
  * @property object $state
  * @property object $payloads
  * @property string $status
- * @property \Illuminate\Support\Carbon|null $applied_at
+ * @property Carbon|null $applied_at
  * @property string|null $info
  * @property int $modifiable_id
  * @property string $modifiable_type
  * @property int $submitted_by
- * @property \Illuminate\Contracts\Auth\Authenticatable $user                            $submitter
+ * @property Authenticatable $user                            $submitter
  * @property Modifiable $modifiable
  * @property int|mixed $applied_by
+ * @property string|null $identifier
  */
 class Modification extends Model
 {
     use HasFactory;
-    use UuidAsPrimaryKey;
+    use HasUuids;
 
     public const STATUS_REJECT = 'reject';
+    public const STATUS_CANCEL = 'cancel';
     public const STATUS_PENDING = 'pending';
     public const STATUS_APPLIED = 'applied';
 
-    public const ACTION_CREATE = 'create';
     public const ACTION_UPDATE = 'update';
+    public const ACTION_DELETE = 'delete';
 
     protected $keyType = 'string';
 
@@ -42,6 +46,7 @@ class Modification extends Model
         'state',
         'payloads',
         'status',
+        'condition',
         'submitted_by',
         'reviewed_by',
         'applied_by',
@@ -60,8 +65,19 @@ class Modification extends Model
         'modifiable_uuid',
         'modifiable_id',
         'submitted_by',
+        'reviewed_by',
         'applied_by',
     ];
+
+    public static function getStatuses(): array
+    {
+        return [
+            self::STATUS_APPLIED,
+            self::STATUS_CANCEL,
+            self::STATUS_PENDING,
+            self::STATUS_REJECT,
+        ];
+    }
 
     public function modifiable(): Relations\MorphTo
     {

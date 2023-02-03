@@ -5,44 +5,45 @@ namespace Dicibi\EloquentModification\Concerns\Modification;
 use Dicibi\EloquentModification\Models\Modification;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\MorphOne;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Arr;
+
 
 /**
  * @property Modification|null pendingModification
  */
 trait HasSnapshotMutator
 {
+    use CastAndAttributeMutatorOverrider;
+
     protected Authenticatable $scopedUserForSnapshot;
 
     protected bool $mutateAttributeToModificationState = false;
-
-    /**
-     * @var int[]|string[]
-     */
-    protected array $loadedRelationsBeforeMutate;
 
     public function shouldMutateAttributeFromState(): bool
     {
         return $this->mutateAttributeToModificationState;
     }
 
-    public function loadSnapshotFor(Authenticatable $authenticatable): self
+    public function loadSnapshotFor(Authenticatable $authenticatable, ?string $modificationStatus = null): void
     {
         $this->scopedUserForSnapshot = $authenticatable;
 
-        $modification = $this->modifications()
-            ->where('submitted_by', $authenticatable->getAuthIdentifier())
-            ->first();
+        $modificationQuery = $this->modifications()
+            ->where('submitted_by', $authenticatable->getAuthIdentifier());
+
+        if ($modificationStatus && in_array($modificationStatus, Modification::getStatuses(), true)) {
+            $modificationQuery->where('status', $modificationStatus);
+        }
+
+        $modification = $modificationQuery->first();
 
         if ($modification) {
             $this->usingModification($modification);
         }
-
-        return $this;
     }
 
-    protected function usingModification(Modification|Model $modification): void
+    public function usingModification(Modification|Model $modification): self
     {
         if ($modification->modifiable_type !== Model::getActualClassNameForMorph(self::class)
             && $modification->modifiable_id !== $this->getKey()) {
@@ -51,76 +52,40 @@ trait HasSnapshotMutator
 
         $relationName = 'modification';
 
-        // If the relation is already loaded, we will not re-load it after we mutate the attributes
-        $this->loadedRelationsBeforeMutate = array_keys(Arr::except($this->getRelations(), [$relationName]));
-        $this->unsetRelations();
+        $loadedRelations = $this->getRelations();
+
+        // relation that need reloaded are relation with self foreign key such as belongs to.
+        $excludedRelations = [$relationName, 'modifications'];
+
+        foreach ($loadedRelations as $loadedRelationName => $modelValue) {
+            $relation = $this->{$loadedRelationName}();
+
+            if (! $relation instanceof BelongsTo) {
+                $excludedRelations[] = $loadedRelationName;
+            }
+        }
+
+        $watchedRelations = array_keys(Arr::except($loadedRelations, $excludedRelations));
+
+        // If the relations is already loaded, we will re-load it all except for modifications and modification.
+        // Reload relations will occur after we mutate the attributes
+        foreach ($watchedRelations as $watchedRelationName) {
+            $this->unsetRelation($watchedRelationName);
+        }
 
         // activate flag to mutate attribute from modification
         $this->mutateAttributeToModificationState = true;
         $this->setRelation($relationName, $modification);
 
-        // reload relations after modify data
-        $this->load($this->loadedRelationsBeforeMutate);
+        // reload relations after modify data later
+        $this->load($watchedRelations);
+
+        return $this;
     }
 
     public function getSnapshotModification(): ?Modification
     {
         return $this->relationLoaded('modification') ? $this->getRelation('modification') : null;
-    }
-
-    public function pendingModification(): MorphOne
-    {
-        return $this->morphOne(Modification::class, 'modifiable')
-            ->latestOfMany()
-            ->where('status', Modification::STATUS_PENDING);
-    }
-
-    public function hasGetMutator($key): bool
-    {
-        if ($this->mutateAttributeToModificationState) {
-            $modification = $this->getSnapshotModification();
-
-            if ($modification) {
-                return property_exists($modification->payloads, $key) || property_exists($modification->status, $key);
-            }
-        }
-
-        return parent::hasGetMutator($key);
-    }
-
-    protected function mutateAttribute($key, $value)
-    {
-        if ($this->mutateAttributeToModificationState) {
-            $modification = $this->getSnapshotModification();
-
-            $modificationValue = null;
-            $modificationPropertyFound = false;
-            if ($modification) {
-                if (property_exists($modification->state, $key)) {
-                    $modificationPropertyFound = true;
-                    $modificationValue = $modification->state->{$key};
-                }
-
-                if (property_exists($modification->payloads, $key)) {
-                    $modificationPropertyFound = true;
-                    $modificationValue = $modification->payloads->{$key};
-                }
-            }
-
-            if ($modificationPropertyFound) {
-                if (parent::hasCast($key)) {
-                    $modificationValue = parent::castAttribute($key, $modificationValue);
-                }
-
-                if (parent::hasGetMutator($key)) {
-                    return parent::mutateAttribute($key, $modificationValue);
-                }
-
-                return $modificationValue;
-            }
-        }
-
-        return parent::mutateAttribute($key, $value);
     }
 
     public function getDifferenceState(): array
@@ -135,7 +100,7 @@ trait HasSnapshotMutator
                 return true;
             }
 
-            $attribute = Arr::get($this->attributes, $key);
+            $attribute = parent::getOriginal($key);
             $snapshotAttribute = $stateFromModification->{$key};
 
             return $attribute === $snapshotAttribute;
@@ -144,7 +109,6 @@ trait HasSnapshotMutator
         foreach ($this->getAttributes() as $key => $value) {
             if (property_exists($payloadFromModification, $key)) {
                 $difference[$key] = $payloadFromModification->{$key};
-
                 continue;
             }
             if (! $mutateAttributeIsEquivalentWithState($key)) {
