@@ -1,6 +1,7 @@
 <?php
 
 use Dicibi\EloquentModification\Tests\Helper;
+
 use function PHPUnit\Framework\assertCount;
 use function PHPUnit\Framework\assertEquals;
 
