@@ -43,7 +43,7 @@ class ProceedModification implements ShouldQueue
 
         $modification->setModifiable($this->modifiable);
 
-        if ($this->modifiable instanceof HasModifiableLimit) {
+        if ($this->modifiable instanceof ModifiableHasIdentifier) {
             $modification->identifier = $this->modifiable->getIdentifierForModifiable();
         }
 

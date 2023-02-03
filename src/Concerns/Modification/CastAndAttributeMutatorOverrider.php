@@ -79,7 +79,9 @@ trait CastAndAttributeMutatorOverrider
 
                     if (parent::hasCast($key)) {
                         $modificationValue = parent::castAttribute($key, $modificationValue);
-                    } elseif (null !== $modificationValue && \in_array($key, parent::getDates(), false)) {
+                    }
+
+                    if (null !== $modificationValue && \in_array($key, parent::getDates(), false)) {
                         $modificationValue = parent::asDateTime($modificationValue);
                     }
                 }
