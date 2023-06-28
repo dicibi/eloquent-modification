@@ -7,6 +7,4 @@ interface ModifiableBag
     public function getPayloads(): array;
 
     public function getState(): array;
-
-    public function castAttributesFromModifiable(Modifiable $modifiable): void;
 }
