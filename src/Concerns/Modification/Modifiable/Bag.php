@@ -2,7 +2,6 @@
 
 namespace Dicibi\EloquentModification\Concerns\Modification\Modifiable;
 
-use Dicibi\EloquentModification\Contracts\Modification\Modifiable;
 use Dicibi\EloquentModification\Contracts\Modification\ModifiableBag;
 
 class Bag implements ModifiableBag
