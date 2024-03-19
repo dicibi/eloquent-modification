@@ -4,12 +4,12 @@ namespace Dicibi\EloquentModification\Tests;
 
 use Dicibi\EloquentModification\EloquentModificationServiceProvider;
 use Illuminate\Foundation\Auth\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Orchestra\Testbench\Concerns\WithWorkbench;
 use Orchestra\Testbench\TestCase as OrchestraTestCase;
 
 class TestCase extends OrchestraTestCase
 {
-    use RefreshDatabase;
+    use WithWorkbench;
 
     protected function getPackageProviders($app): array
     {
@@ -33,5 +33,6 @@ class TestCase extends OrchestraTestCase
     {
         $this->loadLaravelMigrations();
         $this->loadMigrationsFrom(__DIR__ . '/database/migrations');
+        $this->loadMigrationsFrom(dirname(__DIR__) . '/migrations');
     }
 }
